@@ -1,0 +1,12 @@
+FROM python:3.10-bookworm
+
+RUN pip3 download numpy onnxruntime
+
+RUN mkdir x86_64
+RUN cp $(find / -name "numpy*.whl") x86_64/
+RUN cp $(find / -name "onnxruntime*.whl") x86_64/
+
+RUN adduser -u 1000 --disabled-password --gecos "" user
+USER user
+
+ENTRYPOINT ["cp", "-r", "x86_64/", "wheel_extract/"]

@@ -1,0 +1,43 @@
+FROM python:3.10-bookworm
+
+RUN apt-get update
+RUN apt-get install -y build-essential cmake libopenblas-dev
+
+RUN pip3 install numpy
+
+RUN mkdir aarch64
+RUN cp $(find / -name "numpy*.whl") aarch64/
+
+RUN apt-get install -y git
+
+RUN git clone https://github.com/Kitware/CMake.git cmake
+
+WORKDIR /cmake
+RUN ./configure
+RUN make install -j$(nproc)
+
+WORKDIR /
+RUN rm -rf cmake
+
+RUN git clone --recurse-submodules https://github.com/microsoft/onnxruntime.git
+
+RUN pip3 install pybind11 coloredlogs flatbuffers packaging protobuf sympy
+
+WORKDIR /onnxruntime
+RUN ./build.sh --config Release --parallel --update --allow_running_as_root
+
+RUN sed -i 's/defined(__arm__) || defined(_M_ARM)/0/g' build/Linux/Release/_deps/pytorch_cpuinfo-src/include/cpuinfo.h
+RUN sed -i 's/defined(__aarch64__) || defined(_M_ARM64)/1/g' build/Linux/Release/_deps/pytorch_cpuinfo-src/include/cpuinfo.h
+RUN sed -i -E 's/\(std::min<Index>\)\(NumTraits<StorageIndex>::highest().*/size;/g' build/Linux/Release/_deps/eigen-src/Eigen/src/SparseCore/CompressedStorage.h
+
+RUN ./build.sh --config Release --parallel --build --allow_running_as_root
+RUN ./build.sh --config Release --parallel --enable_pybind --build_wheel --skip_tests --allow_running_as_root
+
+WORKDIR /
+RUN cp $(find / -name "onnxruntime*.whl") aarch64/
+RUN rm -rf onnxruntime
+
+RUN adduser -u 1000 --disabled-password --gecos "" user
+USER user
+
+ENTRYPOINT ["cp", "-r", "aarch64/", "wheel_extract/"]

@@ -1,0 +1,11 @@
+services:
+  python-onnx-wheel-extract:
+    privileged: true
+    build:
+      context: .
+      dockerfile: ${ARCH}_wheel_extract
+    image: python-onnx-wheel-extract
+    volumes:
+      - type: bind
+        source: ./../wheel
+        target: /wheel_extract
